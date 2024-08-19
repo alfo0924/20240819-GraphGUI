@@ -2,7 +2,7 @@
 
 主程式: <a href="
 https://github.com/alfo0924/20240819-GraphGUI/blob/7d0510402cafdb77cccd6a02fa4e55d76464edc4/src/main/java/fcu/web/GraphGUI.java
-" >GraphGUI</a>
+" >GraphGUI </a>
 
 
 這是一個用於可視化圖論算法的 Java 應用程序。它允許用戶創建隨機圖形，並執行多種圖論算法，包括最小生成樹 (MST)、關鍵節點查找和最短路徑計算。
