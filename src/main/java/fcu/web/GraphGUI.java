@@ -2,204 +2,281 @@ package fcu.web;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+import java.awt.event.*;
 import java.util.*;
 import java.util.List;
 
 public class GraphGUI extends JFrame {
-    private int vertexCount;
-    private int edgeCount;
-    private java.util.List<Edge> edges;
+    private Graph graph;
     private JPanel graphPanel;
-    private JTextArea outputArea;
-    private JTextField vertexField;
-    private JTextField edgeField;
-    private Map<Integer, Point> vertexPositions;
-    private List<Edge> mstEdges;
+    private JButton calcMSTButton, findCriticalNodesButton, findShortestPathButton;
+    private JTextField srcField, destField;
+    private List<Graph.Edge> mst;
+    private Set<Integer> criticalNodes;
+    private List<Integer> shortestPath;
+    private int src, dest;
 
     public GraphGUI() {
-        setTitle("Graph and MST Visualizer");
+        graph = new Graph(6);
+        graph.addEdge(0, 1, 4);
+        graph.addEdge(0, 2, 3);
+        graph.addEdge(1, 2, 1);
+        graph.addEdge(1, 3, 2);
+        graph.addEdge(2, 3, 4);
+        graph.addEdge(3, 4, 2);
+        graph.addEdge(4, 5, 6);
+
+        setTitle("Graph Algorithm Visualizer");
         setSize(800, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
-
-        JPanel controlPanel = new JPanel();
-        controlPanel.setLayout(new FlowLayout());
-
-        vertexField = new JTextField(5);
-        edgeField = new JTextField(5);
-        JButton generateButton = new JButton("Generate Graph");
-        JButton mstButton = new JButton("Show MST");
-
-        controlPanel.add(new JLabel("Vertices:"));
-        controlPanel.add(vertexField);
-        controlPanel.add(new JLabel("Edges:"));
-        controlPanel.add(edgeField);
-        controlPanel.add(generateButton);
-        controlPanel.add(mstButton);
-
-        add(controlPanel, BorderLayout.NORTH);
 
         graphPanel = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
-                if (edges != null) {
-                    Graphics2D g2 = (Graphics2D) g;
-                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                    g2.setStroke(new BasicStroke(2));
-
-                    // Draw all edges
-                    for (Edge edge : edges) {
-                        Point p1 = vertexPositions.get(edge.v1);
-                        Point p2 = vertexPositions.get(edge.v2);
-                        g2.setColor(Color.LIGHT_GRAY);
-                        g2.drawLine(p1.x, p1.y, p2.x, p2.y);
-                        g2.setColor(Color.BLACK);
-                        g2.drawString(String.valueOf(edge.cost), (p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
-                    }
-
-                    // Highlight MST edges
-                    if (mstEdges != null) {
-                        g2.setColor(Color.RED);
-                        for (Edge edge : mstEdges) {
-                            Point p1 = vertexPositions.get(edge.v1);
-                            Point p2 = vertexPositions.get(edge.v2);
-                            g2.drawLine(p1.x, p1.y, p2.x, p2.y);
-                        }
-                    }
-
-                    // Draw vertices
-                    for (Map.Entry<Integer, Point> entry : vertexPositions.entrySet()) {
-                        Point p = entry.getValue();
-                        g2.setColor(Color.BLUE);
-                        g2.fillOval(p.x - 5, p.y - 5, 10, 10);
-                        g2.setColor(Color.BLACK);
-                        g2.drawString("V" + entry.getKey(), p.x - 15, p.y - 10);
-                    }
-                }
+                drawGraph(g);
             }
         };
         add(graphPanel, BorderLayout.CENTER);
 
-        outputArea = new JTextArea();
-        outputArea.setEditable(false);
-        add(new JScrollPane(outputArea), BorderLayout.SOUTH);
+        JPanel controlPanel = new JPanel();
+        calcMSTButton = new JButton("Calculate MST");
+        findCriticalNodesButton = new JButton("Find Critical Nodes");
+        findShortestPathButton = new JButton("Find Shortest Path");
+        srcField = new JTextField(5);
+        destField = new JTextField(5);
 
-        generateButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                generateGraph();
-            }
+        controlPanel.add(calcMSTButton);
+        controlPanel.add(findCriticalNodesButton);
+        controlPanel.add(new JLabel("Start:"));
+        controlPanel.add(srcField);
+        controlPanel.add(new JLabel("End:"));
+        controlPanel.add(destField);
+        controlPanel.add(findShortestPathButton);
+
+        add(controlPanel, BorderLayout.SOUTH);
+
+        calcMSTButton.addActionListener(e -> {
+            mst = graph.kruskalMST();
+            criticalNodes = null;
+            shortestPath = null;
+            repaint();
         });
 
-        mstButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                showMST();
+        findCriticalNodesButton.addActionListener(e -> {
+            criticalNodes = graph.findCriticalNodes();
+            mst = null;
+            shortestPath = null;
+            repaint();
+        });
+
+        findShortestPathButton.addActionListener(e -> {
+            try {
+                src = Integer.parseInt(srcField.getText());
+                dest = Integer.parseInt(destField.getText());
+                shortestPath = graph.dijkstra(src, dest);
+                mst = null;
+                criticalNodes = null;
+                repaint();
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "Please enter valid node numbers");
             }
         });
     }
 
-    private void generateGraph() {
-        try {
-            vertexCount = Integer.parseInt(vertexField.getText());
-            edgeCount = Integer.parseInt(edgeField.getText());
+    private void drawGraph(Graphics g) {
+        int width = graphPanel.getWidth();
+        int height = graphPanel.getHeight();
+        int radius = Math.min(width, height) / 3;
+        int centerX = width / 2;
+        int centerY = height / 2;
 
-            if (vertexCount < 2 || edgeCount < 1 || edgeCount > vertexCount * (vertexCount - 1) / 2) {
-                JOptionPane.showMessageDialog(this, "Invalid input values.");
-                return;
+        // Draw edges
+        for (Graph.Edge edge : graph.edges) {
+            int x1 = (int) (centerX + radius * Math.cos(2 * Math.PI * edge.source / graph.vertices));
+            int y1 = (int) (centerY + radius * Math.sin(2 * Math.PI * edge.source / graph.vertices));
+            int x2 = (int) (centerX + radius * Math.cos(2 * Math.PI * edge.destination / graph.vertices));
+            int y2 = (int) (centerY + radius * Math.sin(2 * Math.PI * edge.destination / graph.vertices));
+
+            if (mst != null && mst.contains(edge)) {
+                g.setColor(Color.RED);
+            } else if (shortestPath != null && shortestPath.contains(edge.source) && shortestPath.contains(edge.destination)) {
+                g.setColor(Color.BLUE);
+            } else {
+                g.setColor(Color.BLACK);
             }
-
-            edges = new ArrayList<>();
-            vertexPositions = new HashMap<>();
-            Random rand = new Random();
-            Set<String> existingEdges = new HashSet<>();
-
-            // Generate random positions for vertices
-            for (int i = 0; i < vertexCount; i++) {
-                int x = rand.nextInt(graphPanel.getWidth() - 50) + 25;
-                int y = rand.nextInt(graphPanel.getHeight() - 50) + 25;
-                vertexPositions.put(i, new Point(x, y));
-            }
-
-            // Use Kruskal's algorithm to generate a spanning tree without cycles
-            List<Edge> potentialEdges = new ArrayList<>();
-            for (int i = 0; i < vertexCount; i++) {
-                for (int j = i + 1; j < vertexCount; j++) {
-                    int cost = rand.nextInt(99) + 1;
-                    potentialEdges.add(new Edge(i, j, cost));
-                }
-            }
-            Collections.sort(potentialEdges, Comparator.comparingInt(e -> e.cost));
-
-            int[] parent = new int[vertexCount];
-            for (int i = 0; i < vertexCount; i++) {
-                parent[i] = i;
-            }
-
-            for (Edge edge : potentialEdges) {
-                if (edges.size() == vertexCount - 1) break;
-                int root1 = find(parent, edge.v1);
-                int root2 = find(parent, edge.v2);
-
-                if (root1 != root2) {
-                    edges.add(edge);
-                    parent[root1] = root2;
-                }
-            }
-
-            outputArea.setText("Generated Graph:\n");
-            for (Edge edge : edges) {
-                outputArea.append("Edge: " + edge.v1 + " - " + edge.v2 + " Cost: " + edge.cost + "\n");
-            }
-
-            mstEdges = null; // Clear MST edges when generating a new graph
-            graphPanel.repaint();
-        } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "Please enter valid numbers.");
-        }
-    }
-
-    private void showMST() {
-        if (edges == null || edges.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Please generate a graph first.");
-            return;
+            g.drawLine(x1, y1, x2, y2);
+            g.drawString(String.valueOf(edge.weight), (x1 + x2) / 2, (y1 + y2) / 2);
         }
 
-        // Since the graph is already a spanning tree, the MST is the graph itself
-        mstEdges = new ArrayList<>(edges);
+        // Draw vertices
+        for (int i = 0; i < graph.vertices; i++) {
+            int x = (int) (centerX + radius * Math.cos(2 * Math.PI * i / graph.vertices));
+            int y = (int) (centerY + radius * Math.sin(2 * Math.PI * i / graph.vertices));
 
-        outputArea.append("\nMinimum Spanning Tree:\n");
-        for (Edge edge : mstEdges) {
-            outputArea.append("Edge: " + edge.v1 + " - " + edge.v2 + " Cost: " + edge.cost + "\n");
+            if (criticalNodes != null && criticalNodes.contains(i)) {
+                g.setColor(Color.RED);
+            } else if (shortestPath != null && shortestPath.contains(i)) {
+                g.setColor(Color.BLUE);
+            } else {
+                g.setColor(Color.BLACK);
+            }
+            g.fillOval(x - 10, y - 10, 20, 20);
+            g.setColor(Color.WHITE);
+            g.drawString(String.valueOf(i), x - 5, y + 5);
         }
-
-        graphPanel.repaint();
-    }
-
-    private int find(int[] parent, int vertex) {
-        if (parent[vertex] != vertex) {
-            parent[vertex] = find(parent, parent[vertex]);
-        }
-        return parent[vertex];
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            GraphGUI gui = new GraphGUI();
-            gui.setVisible(true);
-        });
+        SwingUtilities.invokeLater(() -> new GraphGUI().setVisible(true));
+    }
+}
+
+class Graph {
+    int vertices;
+    List<Edge> edges;
+
+    public Graph(int v) {
+        this.vertices = v;
+        edges = new ArrayList<>();
     }
 
-    class Edge {
-        int v1, v2, cost;
+    public void addEdge(int u, int v, int w) {
+        edges.add(new Edge(u, v, w));
+    }
 
-        Edge(int v1, int v2, int cost) {
-            this.v1 = v1;
-            this.v2 = v2;
-            this.cost = cost;
+    public List<Edge> kruskalMST() {
+        Collections.sort(edges);
+        int[] parent = new int[vertices];
+        Arrays.fill(parent, -1);
+        List<Edge> mst = new ArrayList<>();
+
+        for (Edge edge : edges) {
+            int x = find(parent, edge.source);
+            int y = find(parent, edge.destination);
+            if (x != y) {
+                mst.add(edge);
+                union(parent, x, y);
+            }
+        }
+        return mst;
+    }
+
+    private int find(int[] parent, int i) {
+        if (parent[i] == -1) return i;
+        return find(parent, parent[i]);
+    }
+
+    private void union(int[] parent, int x, int y) {
+        parent[x] = y;
+    }
+
+    public Set<Integer> findCriticalNodes() {
+        Set<Integer> criticalNodes = new HashSet<>();
+        boolean[] visited = new boolean[vertices];
+        int[] disc = new int[vertices];
+        int[] low = new int[vertices];
+        int[] parent = new int[vertices];
+        Arrays.fill(parent, -1);
+
+        for (int i = 0; i < vertices; i++) {
+            if (!visited[i]) {
+                dfs(i, visited, disc, low, parent, criticalNodes);
+            }
+        }
+        return criticalNodes;
+    }
+
+    private int time = 0;
+
+    private void dfs(int u, boolean[] visited, int[] disc, int[] low, int[] parent, Set<Integer> criticalNodes) {
+        visited[u] = true;
+        disc[u] = low[u] = ++time;
+        int children = 0;
+
+        for (Edge edge : edges) {
+            if (edge.source == u) {
+                int v = edge.destination;
+                if (!visited[v]) {
+                    children++;
+                    parent[v] = u;
+                    dfs(v, visited, disc, low, parent, criticalNodes);
+                    low[u] = Math.min(low[u], low[v]);
+                    if (parent[u] == -1 && children > 1) {
+                        criticalNodes.add(u);
+                    }
+                    if (parent[u] != -1 && low[v] >= disc[u]) {
+                        criticalNodes.add(u);
+                    }
+                } else if (v != parent[u]) {
+                    low[u] = Math.min(low[u], disc[v]);
+                }
+            }
+        }
+    }
+
+    public List<Integer> dijkstra(int start, int end) {
+        int[] dist = new int[vertices];
+        int[] prev = new int[vertices];
+        PriorityQueue<Node> pq = new PriorityQueue<>();
+
+        Arrays.fill(dist, Integer.MAX_VALUE);
+        Arrays.fill(prev, -1);
+        dist[start] = 0;
+        pq.offer(new Node(start, 0));
+
+        while (!pq.isEmpty()) {
+            Node node = pq.poll();
+            int u = node.vertex;
+
+            if (u == end) break;
+
+            for (Edge edge : edges) {
+                if (edge.source == u) {
+                    int v = edge.destination;
+                    int alt = dist[u] + edge.weight;
+                    if (alt < dist[v]) {
+                        dist[v] = alt;
+                        prev[v] = u;
+                        pq.offer(new Node(v, alt));
+                    }
+                }
+            }
+        }
+
+        List<Integer> path = new ArrayList<>();
+        for (int at = end; at != -1; at = prev[at]) {
+            path.add(at);
+        }
+        Collections.reverse(path);
+        return path;
+    }
+
+    class Edge implements Comparable<Edge> {
+        int source, destination, weight;
+
+        Edge(int s, int d, int w) {
+            this.source = s;
+            this.destination = d;
+            this.weight = w;
+        }
+
+        public int compareTo(Edge e) {
+            return Integer.compare(this.weight, e.weight);
+        }
+    }
+
+    class Node implements Comparable<Node> {
+        int vertex, dist;
+
+        Node(int v, int d) {
+            vertex = v;
+            dist = d;
+        }
+
+        public int compareTo(Node n) {
+            return Integer.compare(this.dist, n.dist);
         }
     }
 }
