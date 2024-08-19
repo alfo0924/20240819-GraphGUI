@@ -18,7 +18,7 @@ public class GraphGUI extends JFrame {
     public GraphGUI() {
         graph = new Graph(0);
 
-        setTitle("Graph Algorithm Visualizer");
+        setTitle("D1204433 林俊傑 Graph Algorithm Visualizer");
         setSize(800, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
