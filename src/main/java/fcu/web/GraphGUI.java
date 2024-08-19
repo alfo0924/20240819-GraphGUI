@@ -88,16 +88,17 @@ public class GraphGUI extends JFrame {
     private void drawGraph(Graphics g) {
         int width = graphPanel.getWidth();
         int height = graphPanel.getHeight();
-        int radius = Math.min(width, height) / 3;
-        int centerX = width / 2;
-        int centerY = height / 2;
+        int rows = (int) Math.ceil(Math.sqrt(graph.vertices));
+        int cols = (int) Math.ceil((double) graph.vertices / rows);
+        int cellWidth = width / cols;
+        int cellHeight = height / rows;
 
         // Draw edges
         for (Graph.Edge edge : graph.edges) {
-            int x1 = (int) (centerX + radius * Math.cos(2 * Math.PI * edge.source / graph.vertices));
-            int y1 = (int) (centerY + radius * Math.sin(2 * Math.PI * edge.source / graph.vertices));
-            int x2 = (int) (centerX + radius * Math.cos(2 * Math.PI * edge.destination / graph.vertices));
-            int y2 = (int) (centerY + radius * Math.sin(2 * Math.PI * edge.destination / graph.vertices));
+            int x1 = (edge.source % cols) * cellWidth + cellWidth / 2;
+            int y1 = (edge.source / cols) * cellHeight + cellHeight / 2;
+            int x2 = (edge.destination % cols) * cellWidth + cellWidth / 2;
+            int y2 = (edge.destination / cols) * cellHeight + cellHeight / 2;
 
             if (mst != null && mst.contains(edge)) {
                 g.setColor(Color.RED);
@@ -112,8 +113,8 @@ public class GraphGUI extends JFrame {
 
         // Draw vertices
         for (int i = 0; i < graph.vertices; i++) {
-            int x = (int) (centerX + radius * Math.cos(2 * Math.PI * i / graph.vertices));
-            int y = (int) (centerY + radius * Math.sin(2 * Math.PI * i / graph.vertices));
+            int x = (i % cols) * cellWidth + cellWidth / 2 - 10;
+            int y = (i / cols) * cellHeight + cellHeight / 2 - 10;
 
             if (criticalNodes != null && criticalNodes.contains(i)) {
                 g.setColor(Color.RED);
@@ -122,9 +123,9 @@ public class GraphGUI extends JFrame {
             } else {
                 g.setColor(Color.BLACK);
             }
-            g.fillOval(x - 10, y - 10, 20, 20);
+            g.fillRect(x, y, 20, 20);
             g.setColor(Color.WHITE);
-            g.drawString(String.valueOf(i), x - 5, y + 5);
+            g.drawString(String.valueOf(i), x + 7, y + 15);
         }
     }
 
