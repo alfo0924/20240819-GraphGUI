@@ -2,29 +2,21 @@ package fcu.web;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
 import java.util.*;
 import java.util.List;
 
 public class GraphGUI extends JFrame {
     private Graph graph;
     private JPanel graphPanel;
-    private JButton calcMSTButton, findCriticalNodesButton, findShortestPathButton;
-    private JTextField srcField, destField;
+    private JButton calcMSTButton, findCriticalNodesButton, findShortestPathButton, startButton;
+    private JTextField srcField, destField, vertexCountField, edgeCountField;
     private List<Graph.Edge> mst;
     private Set<Integer> criticalNodes;
     private List<Integer> shortestPath;
     private int src, dest;
 
     public GraphGUI() {
-        graph = new Graph(6);
-        graph.addEdge(0, 1, 4);
-        graph.addEdge(0, 2, 3);
-        graph.addEdge(1, 2, 1);
-        graph.addEdge(1, 3, 2);
-        graph.addEdge(2, 3, 4);
-        graph.addEdge(3, 4, 2);
-        graph.addEdge(4, 5, 6);
+        graph = new Graph(0);
 
         setTitle("Graph Algorithm Visualizer");
         setSize(800, 600);
@@ -44,9 +36,17 @@ public class GraphGUI extends JFrame {
         calcMSTButton = new JButton("Calculate MST");
         findCriticalNodesButton = new JButton("Find Critical Nodes");
         findShortestPathButton = new JButton("Find Shortest Path");
+        startButton = new JButton("Start");
         srcField = new JTextField(5);
         destField = new JTextField(5);
+        vertexCountField = new JTextField(5);
+        edgeCountField = new JTextField(5);
 
+        controlPanel.add(new JLabel("Vertices:"));
+        controlPanel.add(vertexCountField);
+        controlPanel.add(new JLabel("Edges:"));
+        controlPanel.add(edgeCountField);
+        controlPanel.add(startButton);
         controlPanel.add(calcMSTButton);
         controlPanel.add(findCriticalNodesButton);
         controlPanel.add(new JLabel("Start:"));
@@ -56,6 +56,21 @@ public class GraphGUI extends JFrame {
         controlPanel.add(findShortestPathButton);
 
         add(controlPanel, BorderLayout.SOUTH);
+
+        startButton.addActionListener(e -> {
+            try {
+                int vertices = Integer.parseInt(vertexCountField.getText());
+                int edges = Integer.parseInt(edgeCountField.getText());
+                graph = new Graph(vertices);
+                generateConnectedGraph(edges);
+                mst = null;
+                criticalNodes = null;
+                shortestPath = null;
+                repaint();
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "Please enter valid numbers for vertices and edges");
+            }
+        });
 
         calcMSTButton.addActionListener(e -> {
             mst = graph.kruskalMST();
@@ -85,11 +100,42 @@ public class GraphGUI extends JFrame {
         });
     }
 
+    private void generateConnectedGraph(int edgeCount) {
+        Random random = new Random();
+        List<Integer> connectedVertices = new ArrayList<>();
+        connectedVertices.add(0);
+
+        // 確保所有頂點都連接
+        for (int i = 1; i < graph.vertices; i++) {
+            int connectedVertex = connectedVertices.get(random.nextInt(connectedVertices.size()));
+            int weight = random.nextInt(99) + 1; // 1-99
+            graph.addEdge(i, connectedVertex, weight);
+            connectedVertices.add(i);
+            edgeCount--;
+        }
+
+        // 添加剩餘的邊
+        while (edgeCount > 0 && graph.edges.size() < graph.vertices * (graph.vertices - 1) / 2) {
+            int u = random.nextInt(graph.vertices);
+            int v = random.nextInt(graph.vertices);
+            if (u != v && !graph.hasEdge(u, v)) {
+                int weight = random.nextInt(99) + 1; // 1-99
+                graph.addEdge(u, v, weight);
+                edgeCount--;
+            }
+        }
+    }
+
     private void drawGraph(Graphics g) {
         int width = graphPanel.getWidth();
         int height = graphPanel.getHeight();
         int rows = (int) Math.ceil(Math.sqrt(graph.vertices));
         int cols = (int) Math.ceil((double) graph.vertices / rows);
+
+        if (rows == 0 || cols == 0) {
+            return; // 避免除以零
+        }
+
         int cellWidth = width / cols;
         int cellHeight = height / rows;
 
@@ -99,7 +145,6 @@ public class GraphGUI extends JFrame {
             int y1 = (edge.source / cols) * cellHeight + cellHeight / 2;
             int x2 = (edge.destination % cols) * cellWidth + cellWidth / 2;
             int y2 = (edge.destination / cols) * cellHeight + cellHeight / 2;
-
             if (mst != null && mst.contains(edge)) {
                 g.setColor(Color.RED);
             } else if (shortestPath != null && shortestPath.contains(edge.source) && shortestPath.contains(edge.destination)) {
@@ -115,7 +160,6 @@ public class GraphGUI extends JFrame {
         for (int i = 0; i < graph.vertices; i++) {
             int x = (i % cols) * cellWidth + cellWidth / 2 - 10;
             int y = (i / cols) * cellHeight + cellHeight / 2 - 10;
-
             if (criticalNodes != null && criticalNodes.contains(i)) {
                 g.setColor(Color.RED);
             } else if (shortestPath != null && shortestPath.contains(i)) {
@@ -127,6 +171,11 @@ public class GraphGUI extends JFrame {
             g.setColor(Color.WHITE);
             g.drawString(String.valueOf(i), x + 7, y + 15);
         }
+
+        // Display vertex and edge information
+        g.setColor(Color.BLACK);
+        g.drawString("Vertices: " + graph.vertices, 10, 20);
+        g.drawString("Edges: " + graph.edges.size(), 10, 40);
     }
 
     public static void main(String[] args) {
@@ -139,7 +188,7 @@ class Graph {
     List<Edge> edges;
 
     public Graph(int v) {
-        this.vertices = v;
+        this.vertices = Math.max(0, v);
         edges = new ArrayList<>();
     }
 
@@ -147,30 +196,29 @@ class Graph {
         edges.add(new Edge(u, v, w));
     }
 
-    public List<Edge> kruskalMST() {
-        Collections.sort(edges);
-        int[] parent = new int[vertices];
-        Arrays.fill(parent, -1);
-        List<Edge> mst = new ArrayList<>();
-
+    public boolean hasEdge(int u, int v) {
         for (Edge edge : edges) {
-            int x = find(parent, edge.source);
-            int y = find(parent, edge.destination);
-            if (x != y) {
-                mst.add(edge);
-                union(parent, x, y);
+            if ((edge.source == u && edge.destination == v) || (edge.source == v && edge.destination == u)) {
+                return true;
             }
         }
-        return mst;
+        return false;
     }
 
-    private int find(int[] parent, int i) {
-        if (parent[i] == -1) return i;
-        return find(parent, parent[i]);
-    }
+    public List<Edge> kruskalMST() {
+        List<Edge> result = new ArrayList<>();
+        edges.sort(Comparator.comparingInt(e -> e.weight));
 
-    private void union(int[] parent, int x, int y) {
-        parent[x] = y;
+        DisjointSet ds = new DisjointSet(vertices);
+
+        for (Edge edge : edges) {
+            if (ds.find(edge.source) != ds.find(edge.destination)) {
+                result.add(edge);
+                ds.union(edge.source, edge.destination);
+            }
+        }
+
+        return result;
     }
 
     public Set<Integer> findCriticalNodes() {
@@ -183,27 +231,28 @@ class Graph {
 
         for (int i = 0; i < vertices; i++) {
             if (!visited[i]) {
-                dfs(i, visited, disc, low, parent, criticalNodes);
+                dfsForCriticalNodes(i, visited, disc, low, parent, criticalNodes);
             }
         }
+
         return criticalNodes;
     }
 
     private int time = 0;
-
-    private void dfs(int u, boolean[] visited, int[] disc, int[] low, int[] parent, Set<Integer> criticalNodes) {
+    private void dfsForCriticalNodes(int u, boolean[] visited, int[] disc, int[] low, int[] parent, Set<Integer> criticalNodes) {
         visited[u] = true;
         disc[u] = low[u] = ++time;
         int children = 0;
 
         for (Edge edge : edges) {
-            if (edge.source == u) {
-                int v = edge.destination;
+            if (edge.source == u || edge.destination == u) {
+                int v = (edge.source == u) ? edge.destination : edge.source;
                 if (!visited[v]) {
                     children++;
                     parent[v] = u;
-                    dfs(v, visited, disc, low, parent, criticalNodes);
+                    dfsForCriticalNodes(v, visited, disc, low, parent, criticalNodes);
                     low[u] = Math.min(low[u], low[v]);
+
                     if (parent[u] == -1 && children > 1) {
                         criticalNodes.add(u);
                     }
@@ -221,21 +270,17 @@ class Graph {
         int[] dist = new int[vertices];
         int[] prev = new int[vertices];
         PriorityQueue<Node> pq = new PriorityQueue<>();
-
         Arrays.fill(dist, Integer.MAX_VALUE);
         Arrays.fill(prev, -1);
         dist[start] = 0;
         pq.offer(new Node(start, 0));
-
         while (!pq.isEmpty()) {
             Node node = pq.poll();
             int u = node.vertex;
-
             if (u == end) break;
-
             for (Edge edge : edges) {
-                if (edge.source == u) {
-                    int v = edge.destination;
+                if (edge.source == u || edge.destination == u) {
+                    int v = (edge.source == u) ? edge.destination : edge.source;
                     int alt = dist[u] + edge.weight;
                     if (alt < dist[v]) {
                         dist[v] = alt;
@@ -245,7 +290,6 @@ class Graph {
                 }
             }
         }
-
         List<Integer> path = new ArrayList<>();
         for (int at = end; at != -1; at = prev[at]) {
             path.add(at);
@@ -254,30 +298,61 @@ class Graph {
         return path;
     }
 
-    class Edge implements Comparable<Edge> {
+    class Edge {
         int source, destination, weight;
-
         Edge(int s, int d, int w) {
             this.source = s;
             this.destination = d;
             this.weight = w;
         }
-
-        public int compareTo(Edge e) {
-            return Integer.compare(this.weight, e.weight);
-        }
     }
 
     class Node implements Comparable<Node> {
         int vertex, dist;
-
         Node(int v, int d) {
             vertex = v;
             dist = d;
         }
-
         public int compareTo(Node n) {
             return Integer.compare(this.dist, n.dist);
+        }
+    }
+}
+
+class DisjointSet {
+    private int[] parent;
+    private int[] rank;
+
+    public DisjointSet(int n) {
+        parent = new int[n];
+        rank = new int[n];
+        for (int i = 0; i < n; i++) {
+            parent[i] = i;
+        }
+    }
+
+    public int find(int x) {
+        if (parent[x] != x) {
+            parent[x] = find(parent[x]);
+        }
+        return parent[x];
+    }
+
+    public void union(int x, int y) {
+        int xRoot = find(x);
+        int yRoot = find(y);
+
+        if (xRoot == yRoot) {
+            return;
+        }
+
+        if (rank[xRoot] < rank[yRoot]) {
+            parent[xRoot] = yRoot;
+        } else if (rank[xRoot] > rank[yRoot]) {
+            parent[yRoot] = xRoot;
+        } else {
+            parent[yRoot] = xRoot;
+            rank[xRoot]++;
         }
     }
 }
