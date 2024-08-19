@@ -1,21 +1,24 @@
+package fcu.web;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.PriorityQueue;
-import java.util.Random;
+import java.util.*;
 
 public class GraphVisualizerWithSpanningTree extends JFrame {
+
     private JTextField vertexField, edgeField;
     private JTextArea outputArea;
     private JPanel graphPanel;
     private int vertexCount, edgeCount;
     private int[][] graph;
     private boolean[][] mstEdges;
+    private Point[] points;
 
     public GraphVisualizerWithSpanningTree() {
         setTitle("Graph Visualizer with Spanning Tree");
-        setSize(900, 600);
+        setSize(1000, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
@@ -23,11 +26,9 @@ public class GraphVisualizerWithSpanningTree extends JFrame {
         // Top Panel for Inputs
         JPanel inputPanel = new JPanel();
         inputPanel.setLayout(new FlowLayout());
-
         inputPanel.add(new JLabel("Number of Vertices:"));
         vertexField = new JTextField(5);
         inputPanel.add(vertexField);
-
         inputPanel.add(new JLabel("Number of Edges:"));
         edgeField = new JTextField(5);
         inputPanel.add(edgeField);
@@ -51,7 +52,7 @@ public class GraphVisualizerWithSpanningTree extends JFrame {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
-                drawGraph(g);
+                drawSpanningTree(g);
             }
         };
         add(graphPanel, BorderLayout.CENTER);
@@ -91,10 +92,21 @@ public class GraphVisualizerWithSpanningTree extends JFrame {
     private void generateGraph() {
         Random random = new Random();
         graph = new int[vertexCount][vertexCount];
+        points = new Point[vertexCount];
         outputArea.setText("");
         outputArea.append("Graph Details:\n");
 
-        for (int i = 0; i < edgeCount; i++) {
+        // Generate a connected graph
+        for (int i = 1; i < vertexCount; i++) {
+            int connectedTo = random.nextInt(i);
+            int cost = random.nextInt(99) + 1;
+            graph[i][connectedTo] = cost;
+            graph[connectedTo][i] = cost;
+            outputArea.append("Edge: v" + i + " - v" + connectedTo + " Cost: " + cost + "\n");
+        }
+
+        // Add remaining edges
+        for (int i = 0; i < edgeCount - (vertexCount - 1); i++) {
             int v1 = random.nextInt(vertexCount);
             int v2 = random.nextInt(vertexCount);
             if (v1 != v2 && graph[v1][v2] == 0) {
@@ -106,41 +118,45 @@ public class GraphVisualizerWithSpanningTree extends JFrame {
                 i--; // Retry if the edge is not valid (self-loop or duplicate)
             }
         }
-    }
 
-    private void drawGraph(Graphics g) {
-        if (graph == null) return;
-
+        // Generate random positions for vertices, without circular layout
         int panelWidth = graphPanel.getWidth();
         int panelHeight = graphPanel.getHeight();
-        int radius = Math.min(panelWidth, panelHeight) / 3;
-        int centerX = panelWidth / 2;
-        int centerY = panelHeight / 2;
-
-        Point[] points = new Point[vertexCount];
+        int xSpacing = panelWidth / (vertexCount + 1);
+        int ySpacing = panelHeight / (vertexCount + 1);
         for (int i = 0; i < vertexCount; i++) {
-            double angle = 2 * Math.PI * i / vertexCount;
-            int x = centerX + (int) (radius * Math.cos(angle));
-            int y = centerY + (int) (radius * Math.sin(angle));
-            points[i] = new Point(x, y);
-            g.fillOval(x - 10, y - 10, 20, 20);
-            g.drawString("v" + i, x - 15, y - 15);
+            points[i] = new Point((i + 1) * xSpacing, (i + 1) * ySpacing);
         }
+    }
 
+    private void drawSpanningTree(Graphics g) {
+        if (graph == null || mstEdges == null) return;
+
+        Graphics2D g2d = (Graphics2D) g; // Use Graphics2D for better control
+
+        // Draw spanning tree edges
         for (int i = 0; i < vertexCount; i++) {
             for (int j = i + 1; j < vertexCount; j++) {
-                if (graph[i][j] != 0) {
-                    if (mstEdges != null && mstEdges[i][j]) {
-                        g.setColor(Color.RED); // Highlight Spanning Tree edges
-                    } else {
-                        g.setColor(Color.BLACK);
-                    }
-                    g.drawLine(points[i].x, points[i].y, points[j].x, points[j].y);
+                if (mstEdges[i][j]) {
+                    g2d.setColor(Color.RED);
+                    g2d.setStroke(new BasicStroke(4));  // Bold for MST edges
+                    g2d.drawLine(points[i].x, points[i].y, points[j].x, points[j].y);
+
+                    // Draw the cost label in the middle of the edge
                     int midX = (points[i].x + points[j].x) / 2;
                     int midY = (points[i].y + points[j].y) / 2;
-                    g.drawString(String.valueOf(graph[i][j]), midX, midY);
+                    g2d.setColor(Color.BLACK);
+                    g2d.drawString(String.valueOf(graph[i][j]), midX, midY);
                 }
             }
+        }
+
+        // Draw vertices
+        for (int i = 0; i < vertexCount; i++) {
+            g2d.setColor(Color.BLUE);  // Normal vertices
+            g2d.fillOval(points[i].x - 10, points[i].y - 10, 20, 20);
+            g2d.setColor(Color.WHITE);
+            g2d.drawString("v" + i, points[i].x - 5, points[i].y + 5);
         }
     }
 
@@ -148,47 +164,46 @@ public class GraphVisualizerWithSpanningTree extends JFrame {
         mstEdges = new boolean[vertexCount][vertexCount];
         boolean[] inMST = new boolean[vertexCount];
         PriorityQueue<Edge> pq = new PriorityQueue<>((e1, e2) -> Integer.compare(e1.cost, e2.cost));
-        inMST[0] = true;
 
+        inMST[0] = true;
         for (int i = 1; i < vertexCount; i++) {
             if (graph[0][i] != 0) {
                 pq.offer(new Edge(0, i, graph[0][i]));
             }
         }
 
-        outputArea.append("\nSpanning Tree Edges:\n");
-
         while (!pq.isEmpty()) {
             Edge edge = pq.poll();
-            if (inMST[edge.v2]) continue;
+            if (!inMST[edge.to]) {
+                mstEdges[edge.from][edge.to] = mstEdges[edge.to][edge.from] = true;
+                inMST[edge.to] = true;
 
-            inMST[edge.v2] = true;
-            mstEdges[edge.v1][edge.v2] = true;
-            mstEdges[edge.v2][edge.v1] = true;
-            outputArea.append("Edge: v" + edge.v1 + " - v" + edge.v2 + " Cost: " + edge.cost + "\n");
-
-            for (int i = 0; i < vertexCount; i++) {
-                if (!inMST[i] && graph[edge.v2][i] != 0) {
-                    pq.offer(new Edge(edge.v2, i, graph[edge.v2][i]));
+                for (int i = 0; i < vertexCount; i++) {
+                    if (!inMST[i] && graph[edge.to][i] != 0) {
+                        pq.offer(new Edge(edge.to, i, graph[edge.to][i]));
+                    }
                 }
             }
+        }
+        outputArea.append("Minimum Spanning Tree generated.\n");
+    }
+
+    private static class Edge {
+        int from, to, cost;
+
+        public Edge(int from, int to, int cost) {
+            this.from = from;
+            this.to = to;
+            this.cost = cost;
         }
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            GraphVisualizerWithSpanningTree graphVisualizer = new GraphVisualizerWithSpanningTree();
-            graphVisualizer.setVisible(true);
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                new GraphVisualizerWithSpanningTree().setVisible(true);
+            }
         });
-    }
-
-    class Edge {
-        int v1, v2, cost;
-
-        public Edge(int v1, int v2, int cost) {
-            this.v1 = v1;
-            this.v2 = v2;
-            this.cost = cost;
-        }
     }
 }
