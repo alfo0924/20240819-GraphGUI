@@ -1,5 +1,7 @@
 # Graph Algorithm Visualizer
 
+主程式: GraphGUI
+
 這是一個用於可視化圖論算法的 Java 應用程序。它允許用戶創建隨機圖形，並執行多種圖論算法，包括最小生成樹 (MST)、關鍵節點查找和最短路徑計算。
 
 ## 功能
