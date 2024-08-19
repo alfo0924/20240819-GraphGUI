@@ -124,17 +124,30 @@ public class GraphGUI extends JFrame {
                 vertexPositions.put(i, new Point(x, y));
             }
 
-            // Generate random edges
-            for (int i = 0; i < edgeCount; i++) {
-                int v1 = rand.nextInt(vertexCount);
-                int v2 = rand.nextInt(vertexCount);
-                if (v1 == v2 || existingEdges.contains(v1 + "-" + v2) || existingEdges.contains(v2 + "-" + v1)) {
-                    i--;
-                    continue;
+            // Use Kruskal's algorithm to generate a spanning tree without cycles
+            List<Edge> potentialEdges = new ArrayList<>();
+            for (int i = 0; i < vertexCount; i++) {
+                for (int j = i + 1; j < vertexCount; j++) {
+                    int cost = rand.nextInt(99) + 1;
+                    potentialEdges.add(new Edge(i, j, cost));
                 }
-                int cost = rand.nextInt(99) + 1;
-                edges.add(new Edge(v1, v2, cost));
-                existingEdges.add(v1 + "-" + v2);
+            }
+            Collections.sort(potentialEdges, Comparator.comparingInt(e -> e.cost));
+
+            int[] parent = new int[vertexCount];
+            for (int i = 0; i < vertexCount; i++) {
+                parent[i] = i;
+            }
+
+            for (Edge edge : potentialEdges) {
+                if (edges.size() == vertexCount - 1) break;
+                int root1 = find(parent, edge.v1);
+                int root2 = find(parent, edge.v2);
+
+                if (root1 != root2) {
+                    edges.add(edge);
+                    parent[root1] = root2;
+                }
             }
 
             outputArea.setText("Generated Graph:\n");
@@ -155,23 +168,8 @@ public class GraphGUI extends JFrame {
             return;
         }
 
-        Collections.sort(edges, Comparator.comparingInt(e -> e.cost));
-
-        int[] parent = new int[vertexCount];
-        for (int i = 0; i < vertexCount; i++) {
-            parent[i] = i;
-        }
-
-        mstEdges = new ArrayList<>();
-        for (Edge edge : edges) {
-            int root1 = find(parent, edge.v1);
-            int root2 = find(parent, edge.v2);
-
-            if (root1 != root2) {
-                mstEdges.add(edge);
-                parent[root1] = root2;
-            }
-        }
+        // Since the graph is already a spanning tree, the MST is the graph itself
+        mstEdges = new ArrayList<>(edges);
 
         outputArea.append("\nMinimum Spanning Tree:\n");
         for (Edge edge : mstEdges) {
